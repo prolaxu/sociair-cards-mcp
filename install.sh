@@ -148,6 +148,7 @@ if [ "$DO_CLAUDE" != 0 ] && command -v claude >/dev/null 2>&1; then
   rm -rf "$CLAUDE_COMMANDS"
   cp -r "$ROOT/clients/claude-code/commands/soci-card" "$CLAUDE_COMMANDS"
   ok "installed /soci-card:read :move :boards :comment :set-token"
+  CONFIGURED="Claude Code"
 elif [ "$DO_CLAUDE" = 0 ]; then
   say "skipped (--no-claude)"
 else
