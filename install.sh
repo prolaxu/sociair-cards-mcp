@@ -32,7 +32,7 @@ SERVER_ID="sociair-cards"
 CURSOR_JSON="$HOME/.cursor/mcp.json"
 CLAUDE_COMMANDS="$HOME/.claude/commands/soci-card"
 
-TOKEN="" ; DO_CLAUDE=auto ; DO_CURSOR=auto ; UNINSTALL=0 ; WRITES=""
+TOKEN="" ; DO_CLAUDE=auto ; DO_CURSOR=auto ; UNINSTALL=0 ; WRITES="" ; CONFIGURED=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -171,6 +171,7 @@ if [ "$DO_CURSOR" != 0 ]; then
     fs.writeFileSync(f, JSON.stringify(j,null,2)+"\n");
   ' "$CURSOR_JSON" "$SERVER_ID" "$LAUNCHER"
   ok "registered in $CURSOR_JSON (other servers left untouched)"
+  CONFIGURED="${CONFIGURED:+$CONFIGURED and }Cursor"
   say "rules: cp $ROOT/clients/cursor/rules/*.mdc <your-repo>/.cursor/rules/"
 else
   say "skipped (--no-cursor)"
@@ -204,5 +205,9 @@ result=$(printf '%s\n' \
 
 head_ "Done"
 say "Installed at $ROOT"
-say "Restart Claude Code and Cursor to pick up the server."
-say "Then try:  /soci-card:read SC-TASK-2026-6850"
+if [ -n "$CONFIGURED" ]; then
+  say "Restart $CONFIGURED to pick up the server."
+  say "Then try:  /soci-card:read SC-TASK-2026-6850"
+else
+  say "No editor was configured. Re-run without --no-claude / --no-cursor to register one."
+fi

@@ -28,9 +28,13 @@ function loadEnvFile(file) {
 
 loadEnvFile(ENV_FILE);
 
+// The shipped .env.example placeholder is not a token — treat it as unset so the
+// error says "no token" instead of "expired".
+const rawToken = (process.env.SOCIAIR_TOKEN || "").trim();
+
 export const CONFIG = {
   base: (process.env.SOCIAIR_API_BASE || "https://new-central-api.sociair.com/api").replace(/\/+$/, ""),
-  token: process.env.SOCIAIR_TOKEN || "",
+  token: rawToken === "paste-your-bearer-token-here" ? "" : rawToken,
   origin: process.env.SOCIAIR_ORIGIN || "https://onewindow.sociair.io",
   fiscalYearId: process.env.SOCIAIR_FISCAL_YEAR_ID || "4",
   timeoutMs: Number(process.env.SOCIAIR_TIMEOUT_MS || 30000),
