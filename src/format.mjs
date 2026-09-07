@@ -17,13 +17,55 @@ export function htmlToText(html) {
     .trim();
 }
 
+export const escapeHtml = (text) =>
+  String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 /** Plain text -> the minimal HTML the CRM's comment box produces. */
 export function textToHtml(text) {
-  const esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return esc
+  return escapeHtml(text)
     .split(/\n{2,}/)
     .map((para) => `<p>${para.replace(/\n/g, "<br>")}</p>`)
     .join("");
+}
+
+/** "1. do this" / "- do this" -> "do this"; a blob of lines -> one step per line. */
+function toSteps(steps) {
+  const lines = Array.isArray(steps) ? steps : String(steps ?? "").split(/\n+/);
+  return lines
+    .map((s) => String(s).trim().replace(/^(?:[-*\u2022]|\d+[.)])\s+/, "").trim())
+    .filter(Boolean);
+}
+
+/**
+ * Assemble a card description in the house format the CRM's own bug cards use:
+ * the summary, then Steps to Reproduce / Actual Result / Expected Result. The
+ * editor stores TipTap HTML, so that is what goes on the wire.
+ */
+export function buildCardDescription({
+  description,
+  steps_to_reproduce,
+  actual_result,
+  expected_result,
+  html = false,
+} = {}) {
+  const block = (t) => (html ? String(t).trim() : textToHtml(String(t).trim()));
+  const inline = (t) => (html ? String(t).trim() : escapeHtml(String(t).trim()).replace(/\n/g, "<br>"));
+
+  const parts = [];
+  if (String(description ?? "").trim()) parts.push(block(description));
+
+  const steps = toSteps(steps_to_reproduce);
+  if (steps.length) {
+    parts.push("<p><strong>Steps to Reproduce:</strong></p>");
+    parts.push(`<ol>${steps.map((s) => `<li><p>${inline(s)}</p></li>`).join("")}</ol>`);
+  }
+  if (String(actual_result ?? "").trim()) {
+    parts.push(`<p><strong>Actual Result:</strong><br>${inline(actual_result)}</p>`);
+  }
+  if (String(expected_result ?? "").trim()) {
+    parts.push(`<p><strong>Expected Result:</strong><br>${inline(expected_result)}</p>`);
+  }
+  return parts.join("");
 }
 
 export const compactCard = (t) => ({

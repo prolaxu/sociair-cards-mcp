@@ -1,7 +1,7 @@
 # sociair-cards-mcp
 
 Read and update Sociair CRM cards from Claude Code and Cursor — description, comments, subtasks,
-screenshots, and moving a card between board stages.
+screenshots, creating a card on a board, and moving one between stages.
 
 Zero dependencies: plain Node (>= 18) speaking MCP over stdio.
 
@@ -18,8 +18,8 @@ afterwards.
 Already have a checkout? `./install.sh` does the same thing in place. Re-running is always safe.
 
 ```
---token <t>   save a token non-interactively      --no-claude / --no-cursor  skip a client
---writes      enable move_card / add_card_comment --uninstall                undo the above
+--token <t>   save a token non-interactively   --no-claude / --no-cursor  skip a client
+--writes      enable the write tools            --uninstall                undo the above
 ```
 
 ## Use it
@@ -27,13 +27,14 @@ Already have a checkout? `./install.sh` does the same thing in place. Re-running
 ```
 /soci-card:read SC-TASK-2026-6850          read a card end to end, screenshots included
 /soci-card:boards SC-TASK-2026-6850        show its board's columns
+/soci-card:create Sociair - HRIS  leave balance shows 0 after carry forward
 /soci-card:move SC-TASK-2026-6850 In Progress
 /soci-card:comment SC-TASK-2026-6850 fixed on branch xyz
 /soci-card:set-token <token>               when the old one expires
 ```
 
-Cursor gets the same five as skills, named with a dash — `/soci-card-read`, `/soci-card-move`,
-`/soci-card-boards`, `/soci-card-comment`, `/soci-card-set-token` — installed to
+Cursor gets the same six as skills, named with a dash — `/soci-card-read`, `/soci-card-create`,
+`/soci-card-move`, `/soci-card-boards`, `/soci-card-comment`, `/soci-card-set-token` — installed to
 `~/.cursor/skills/`. Asking in plain words works too. For a repo where you want the workflow
 always in context, copy `clients/cursor/rules/*.mdc` into its `.cursor/rules/`.
 
@@ -43,14 +44,33 @@ always in context, copy `clients/cursor/rules/*.mdc` into its `.cursor/rules/`.
 `get_card_conversation`, `download_card_attachments`, `list_boards`, `get_board_stages`,
 `get_card_link`, `sociair_api_get`
 
-**Write** — `move_card`, `add_card_comment`
+**Write** — `create_card`, `move_card`, `add_card_comment`
 
 **Auth** — `set_token`, `check_token`
 
 ## Writes
 
 Off by default. `./install.sh --writes` (or `SOCIAIR_ALLOW_WRITES=1` in `.env`) turns on
-`move_card` and `add_card_comment`. Everything else is read-only either way.
+`create_card`, `move_card` and `add_card_comment`. Everything else is read-only either way.
+
+`create_card` takes board and stage names, like `move_card`. With no stage the card lands on the
+board's first column. A bug gets the house layout — summary, **Steps to Reproduce:**, **Actual
+Result:**, **Expected Result:** — straight from the arguments:
+
+```
+create_card {
+  board: "Sociair - HRIS",
+  title: "Leave balance shows 0 after carry forward",
+  activity: "Bug Reporting",
+  description: "Env: Live. After LCF-2026-1 ran, affected employees show a 0 opening balance.",
+  steps_to_reproduce: ["Log in as an affected employee", "Open HR > Leave > Balance"],
+  actual_result: "Opening balance is 0 for 265 of 286 employees.",
+  expected_result: "The carried-forward balance from last fiscal year is shown."
+}
+```
+
+`activity` is the Topic the CRM's own create form makes you pick — `Bug Reporting`, `General Task`,
+and so on. The create endpoint ignores a due date; set one in the CRM afterwards.
 
 `move_card` takes stage names, resolved against the card's own board — a wrong name comes back
 with the real ones rather than failing opaquely:

@@ -21,6 +21,25 @@ server — read this before changing how it talks to the API.
 
 ## Writing
 
+- `create_card` POSTs `crm/task`. `CrudController::store` does `$request->only($fields)` where the
+  fields come from `CrmTask::getFields()` — so **only** title, description, priority, severity,
+  mst_project_id, mst_dynamic_form(_fields), taskable_type/_id and custom_fields survive. Anything
+  else (a `due_date`, for instance) is silently dropped; due dates have to be set by a later edit.
+- The board and stage do **not** come through that filter. They arrive via `CrmTask::mergeRequest()`,
+  which reads `crm_pipeline['id']` and `crm_pipeline_stage['id']` — so they must be sent as
+  **objects**, not bare ids. `crm_pipeline_stage` is `required_with:crm_pipeline`.
+- `afterCreateProcess()` is what applies `members`, `tags`, `mst_project_id` and `crm_task_category_id`,
+  and it forces `owned_by` to the authenticated user. It runs inside the store transaction, so a
+  failure there rolls the card back rather than leaving a half-made one.
+- The Activity/Topic is a dynamic form (`mst_dynamic_form_id`), listed at
+  `hris/dynamic-forms/dropdown` and searchable with `filters={"search":"bug"}`. It is nullable in the
+  DB, but the web create form refuses to show the title field until one is picked, so a card without
+  it looks half-filled. Bug topics carry no fields of their own — "Actual Result" and "Expected
+  Result" are a convention inside the description HTML, not form fields.
+- Descriptions are TipTap HTML. The house bug layout is a summary paragraph, then
+  `<p><strong>Steps to Reproduce:</strong></p><ol>…</ol>`, then `<p><strong>Actual Result:</strong><br>…</p>`
+  and the same for Expected Result.
+
 - `move_card` uses `master/kanban/change-kanban-stage`, the same endpoint the board's
   drag-and-drop calls, so the backend's guards still apply: it refuses a move into a `COMPLETED`
   stage while the card has incomplete subtasks, and wants a `lost_reason` for a `LOST` stage.

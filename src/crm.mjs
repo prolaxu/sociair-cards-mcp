@@ -1,7 +1,7 @@
 // Shared lookups against the CRM: resolving a card reference, and reading boards/stages.
 import { apiGet } from "./api.mjs";
 import { ApiError } from "./config.mjs";
-import { compactStage } from "./format.mjs";
+import { compactStage, matchByName } from "./format.mjs";
 
 /** Accepts a numeric id or a task number like SC-TASK-2026-5612. */
 export async function resolveCardId(card) {
@@ -47,4 +47,33 @@ export async function listStages(boardId) {
   });
   const rows = Array.isArray(res?.data) ? res.data : [];
   return rows.map(compactStage).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * Activities (aka Topics) — the dynamic form a card is filed under. The create
+ * form makes you pick one before it will even show the title field, so a card
+ * created without one looks half-filled in the UI.
+ */
+export async function listActivities(search, limit = 50) {
+  const res = await apiGet("hris/dynamic-forms/dropdown", {
+    filters: search ? { search } : undefined,
+    rowsPerPage: limit,
+  });
+  const page = res?.data ?? {};
+  const rows = Array.isArray(page) ? page : page.data || [];
+  return rows.map((r) => ({ id: r.id, name: r.name }));
+}
+
+/** Accepts a numeric id or an activity name like "Bug Reporting". */
+export async function resolveActivity(activity) {
+  const ref = String(activity).trim();
+  if (/^\d+$/.test(ref)) return { id: Number(ref) };
+  const rows = await listActivities(ref);
+  if (!rows.length) {
+    throw new ApiError(
+      `No activity (topic) matches "${ref}". List them with ` +
+        'sociair_api_get { endpoint: "hris/dynamic-forms/dropdown" }.',
+    );
+  }
+  return matchByName(rows, ref, "activity");
 }

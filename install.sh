@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
 Usage: ./install.sh [options]
 
   --token <t>    Save this bearer token (otherwise you are prompted if none is set)
-  --writes       Enable move_card / add_card_comment (default: read-only)
+  --writes       Enable create_card / move_card / add_card_comment (default: read-only)
   --no-claude    Skip Claude Code
   --no-cursor    Skip Cursor
   --uninstall    Remove the registrations and commands (leaves this directory and .env)
@@ -139,7 +139,7 @@ fi
 
 if [ -n "$WRITES" ]; then
   set_env_key SOCIAIR_ALLOW_WRITES "$WRITES"
-  [ "$WRITES" = 1 ] && ok "writes enabled (move_card, add_card_comment)" || ok "writes disabled"
+  [ "$WRITES" = 1 ] && ok "writes enabled (create_card, move_card, add_card_comment)" || ok "writes disabled"
 fi
 
 # ---------------------------------------------------------------- claude code
@@ -154,7 +154,7 @@ if [ "$DO_CLAUDE" != 0 ] && command -v claude >/dev/null 2>&1; then
   mkdir -p "$(dirname "$CLAUDE_COMMANDS")"
   rm -rf "$CLAUDE_COMMANDS"
   cp -r "$ROOT/clients/claude-code/commands/soci-card" "$CLAUDE_COMMANDS"
-  ok "installed /soci-card:read :move :boards :comment :set-token"
+  ok "installed /soci-card:read :create :move :boards :comment :set-token"
   CONFIGURED="Claude Code"
 elif [ "$DO_CLAUDE" = 0 ]; then
   say "skipped (--no-claude)"
@@ -187,7 +187,7 @@ if [ "$DO_CURSOR" != 0 ]; then
     rm -rf "${CURSOR_SKILLS:?}/$name"
     cp -r "$skill" "$CURSOR_SKILLS/$name"
   done
-  ok "installed /soci-card-read -move -boards -comment -set-token"
+  ok "installed /soci-card-read -create -move -boards -comment -set-token"
   CONFIGURED="${CONFIGURED:+$CONFIGURED and }Cursor"
   say "optional per-repo rule: cp $ROOT/clients/cursor/rules/*.mdc <your-repo>/.cursor/rules/"
 else

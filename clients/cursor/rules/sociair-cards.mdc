@@ -26,11 +26,19 @@ start changing code until I say go.
 card sits on (the card's current stage comes back marked `current: true`). Do this before moving
 anything — never guess a stage id.
 
+## Creating a card
+
+`create_card` with the board name as I wrote it, and no stage unless I asked for one (the card
+lands on the board's first column). Pass an `activity` — the Topic, `Bug Reporting` for a bug,
+`General Task` otherwise. A bug needs all four content fields: `description`,
+`steps_to_reproduce`, `actual_result`, `expected_result`. Show me the title, board and description
+text before creating anything.
+
 ## Changing a card
 
-`move_card` and `add_card_comment` write to shared data other people see, and there is no undo.
-Only use them when I ask, on exactly the card I named, and show me a comment's text before posting
-it. If either returns "Writes are disabled", tell me — it means `SOCIAIR_ALLOW_WRITES=1` is not
+`create_card`, `move_card` and `add_card_comment` write to shared data other people see, and there
+is no undo. Only use them when I ask, on exactly the card I named, and show me a comment's text
+before posting it. If either returns "Writes are disabled", tell me — it means `SOCIAIR_ALLOW_WRITES=1` is not
 set in the server's `.env`.
 
 Moving a card into a `COMPLETED` stage also flips its completion state.

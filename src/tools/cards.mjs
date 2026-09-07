@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { apiGet } from "../api.mjs";
-import { ApiError, SERVER_NAME, SERVER_VERSION } from "../config.mjs";
-import { compactCard, htmlToText } from "../format.mjs";
-import { getCardDetail, resolveCardId } from "../crm.mjs";
+import { apiGet, apiPost } from "../api.mjs";
+import { ApiError, SERVER_NAME, SERVER_VERSION, requireWrites } from "../config.mjs";
+import { buildCardDescription, compactCard, htmlToText, matchByName } from "../format.mjs";
+import { getCardDetail, listBoards, listStages, resolveActivity, resolveCardId } from "../crm.mjs";
 
 const SECTIONS = ["detail", "subtasks", "attachments", "timeline", "time_entries"];
 const CARD_ARG = { type: "string", description: "Task number (SC-TASK-2026-5612) or numeric task id." };
@@ -299,6 +299,131 @@ export const downloadCardAttachments = {
       count: saved.length,
       attachments: saved,
       note: "Open the `file` paths with your editor's file-reading tool (Read in Claude Code, read_file in Cursor) to view images/PDFs.",
+    };
+  },
+};
+
+const LEVELS = { low: 1, medium: 2, high: 3, critical: 4 };
+
+/** "high" | "3" | 3 -> 3. The backend takes the integer. */
+function level(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") value = String(value);
+  const key = String(value).trim().toLowerCase();
+  if (/^[1-4]$/.test(key)) return Number(key);
+  if (LEVELS[key]) return LEVELS[key];
+  throw new ApiError(`Unknown ${label} "${value}". Use ${Object.keys(LEVELS).join(", ")} or 1-4.`);
+}
+
+export const createCard = {
+  name: "create_card",
+  description:
+    "WRITE — create a new card (task) on a board. `board` and `stage` take names ('E-com, Acc & Inv', " +
+    "'Backlog') or ids; with no stage the card lands on the board's first column. " +
+    "For a bug, pass `steps_to_reproduce`, `actual_result` and `expected_result` — they are rendered " +
+    "into the description in the same shape as the CRM's own bug cards, under **Actual Result:** and " +
+    "**Expected Result:** headings. Requires SOCIAIR_ALLOW_WRITES=1. " +
+    "Note the create endpoint ignores a due date; set one afterwards in the CRM.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Card title (required, max 255 chars)." },
+      board: { type: "string", description: "Board to create it on: name or numeric pipeline id." },
+      stage: {
+        type: "string",
+        description: "Stage (column) on that board: name or id. Default: the board's first stage.",
+      },
+      description: {
+        type: "string",
+        description:
+          "The summary paragraph(s). Plain text unless `html` is true — blank lines become paragraphs.",
+      },
+      steps_to_reproduce: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Bug repro steps, one per entry. Rendered as a numbered list under a **Steps to Reproduce:** heading.",
+      },
+      actual_result: { type: "string", description: "What actually happens. Rendered under **Actual Result:**." },
+      expected_result: {
+        type: "string",
+        description: "What should happen instead. Rendered under **Expected Result:**.",
+      },
+      activity: {
+        type: "string",
+        description:
+          "Activity / Topic the card is filed under — name ('Bug Reporting', 'General Task') or id. " +
+          "The CRM's own create form requires one, so pass it for anything a person will look at.",
+      },
+      priority: { type: "string", description: "low | medium | high | critical (or 1-4). Default: low." },
+      severity: { type: "string", description: "low | medium | high | critical (or 1-4)." },
+      members: {
+        type: "array",
+        items: { type: "integer" },
+        description: "User ids to assign. Look ids up with sociair_api_get on master/users.",
+      },
+      project_id: { type: "integer", description: "Project (mst_project_id) to file the card under." },
+      tags: { type: "array", items: { type: "string" }, description: "Tag names." },
+      html: {
+        type: "boolean",
+        description: "Treat the text fields as HTML instead of plain text (default false).",
+      },
+    },
+    required: ["title", "board"],
+    additionalProperties: false,
+  },
+  async run(args) {
+    requireWrites(); // fail before spending lookups on a card we cannot create
+    const title = String(args.title ?? "").trim();
+    if (!title) throw new ApiError("`title` is empty.");
+    if (title.length > 255) throw new ApiError(`\`title\` is ${title.length} chars; the backend caps it at 255.`);
+
+    const board = matchByName(await listBoards(), args.board, "board");
+    const stages = await listStages(board.id);
+    if (!stages.length) throw new ApiError(`Board "${board.name}" has no stages to create a card in.`);
+    // The backend rejects a pipeline without a stage, so always send both.
+    const stage = args.stage ? matchByName(stages, args.stage, "stage") : stages[0];
+    const activity = args.activity ? await resolveActivity(args.activity) : null;
+    const priority = level(args.priority, "priority");
+    const severity = level(args.severity, "severity");
+
+    const description = buildCardDescription({
+      description: args.description,
+      steps_to_reproduce: args.steps_to_reproduce,
+      actual_result: args.actual_result,
+      expected_result: args.expected_result,
+      html: args.html === true,
+    });
+
+    // `crm_pipeline` / `crm_pipeline_stage` must be objects — the backend reads
+    // `['id']` off them and ignores bare ids. See NOTES.md.
+    const created = await apiPost("crm/task", {
+      title,
+      ...(description ? { description } : {}),
+      crm_pipeline: { id: board.id, name: board.name },
+      crm_pipeline_stage: { id: stage.id, display_name: stage.name },
+      ...(activity ? { mst_dynamic_form: { id: activity.id }, mst_dynamic_form_id: activity.id } : {}),
+      ...(priority ? { priority } : {}),
+      ...(severity ? { severity } : {}),
+      ...(args.members?.length ? { members: args.members.map((id) => ({ id })) } : {}),
+      ...(args.project_id ? { mst_project_id: args.project_id } : {}),
+      ...(args.tags?.length ? { tags: args.tags } : {}),
+    });
+
+    const row = created?.data ?? created;
+    const id = row?.id;
+    if (!id) throw new ApiError(`The CRM accepted the request but returned no card id: ${JSON.stringify(row).slice(0, 300)}`);
+    // Re-read it: the create response is the bare model, without the board/stage
+    // names and the task number the caller wants to quote back.
+    const detail = await getCardDetail(id).catch(() => null);
+    return {
+      created: true,
+      card_id: id,
+      task_number: detail?.task_number ?? row?.task_number,
+      board: board.name,
+      stage: stage.name,
+      activity: activity ? (activity.name ?? activity.id) : null,
+      card: detail ? compactCard(detail) : null,
     };
   },
 };

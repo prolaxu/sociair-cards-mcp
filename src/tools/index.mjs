@@ -9,6 +9,7 @@ import { sociairApiGet } from "./raw.mjs";
 
 const ALL = [
   cards.getCard,
+  cards.createCard,
   cards.searchCards,
   cards.listMyCards,
   cards.getCardTimeline,
