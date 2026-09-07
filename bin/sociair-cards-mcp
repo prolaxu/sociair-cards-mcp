@@ -1,0 +1,47 @@
+#!/bin/sh
+# Launcher for the MCP server.
+#
+# GUI-launched editors (Cursor, VS Code started from a desktop icon) do not
+# inherit a login shell, so an nvm-managed `node` is not on PATH and the server
+# dies with "command not found". This finds node the hard way, then execs it.
+#
+# Point your MCP config at this script rather than at `node server.mjs`.
+
+set -e
+HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+find_node() {
+  # 1. Already on PATH (Claude Code from a terminal, or a system install).
+  if command -v node >/dev/null 2>&1; then
+    command -v node
+    return
+  fi
+  # 2. nvm's default alias, then the newest installed version.
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    alias_file="$HOME/.nvm/alias/default"
+    if [ -f "$alias_file" ]; then
+      want=$(cat "$alias_file")
+      case "$want" in
+        v*) [ -x "$HOME/.nvm/versions/node/$want/bin/node" ] && \
+              { echo "$HOME/.nvm/versions/node/$want/bin/node"; return; } ;;
+      esac
+    fi
+    newest=$(ls -1 "$HOME/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)
+    if [ -n "$newest" ] && [ -x "$HOME/.nvm/versions/node/$newest/bin/node" ]; then
+      echo "$HOME/.nvm/versions/node/$newest/bin/node"
+      return
+    fi
+  fi
+  # 3. Common absolute locations.
+  for candidate in /usr/local/bin/node /usr/bin/node /opt/homebrew/bin/node /snap/bin/node; do
+    [ -x "$candidate" ] && { echo "$candidate"; return; }
+  done
+}
+
+NODE=$(find_node)
+if [ -z "$NODE" ]; then
+  echo "sociair-cards-mcp: could not find node. Install Node >= 18, or set NODE_BIN." >&2
+  exit 127
+fi
+
+exec "${NODE_BIN:-$NODE}" "$HERE/server.mjs" "$@"

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "sociair-cards": {
+      "command": "./bin/sociair-cards-mcp"
+    }
+  }
+}
