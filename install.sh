@@ -31,6 +31,7 @@ LAUNCHER="$ROOT/bin/sociair-cards-mcp"
 SERVER_ID="sociair-cards"
 CURSOR_JSON="$HOME/.cursor/mcp.json"
 CLAUDE_COMMANDS="$HOME/.claude/commands/soci-card"
+CURSOR_SKILLS="$HOME/.cursor/skills"
 
 TOKEN="" ; DO_CLAUDE=auto ; DO_CURSOR=auto ; UNINSTALL=0 ; WRITES="" ; CONFIGURED=""
 
@@ -67,7 +68,13 @@ head_() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 if [ "$UNINSTALL" = 1 ]; then
   head_ "Uninstalling $SERVER_ID"
   command -v claude >/dev/null 2>&1 && claude mcp remove "$SERVER_ID" -s user >/dev/null 2>&1 && ok "removed from Claude Code" || true
-  rm -rf "$CLAUDE_COMMANDS" && ok "removed /soci-card: commands"
+  rm -rf "$CLAUDE_COMMANDS" && ok "removed Claude Code commands"
+  if [ -d "$CURSOR_SKILLS" ]; then
+    for skill in "$ROOT"/clients/cursor/skills/*/; do
+      rm -rf "${CURSOR_SKILLS:?}/$(basename "$skill")"
+    done
+    ok "removed Cursor skills"
+  fi
   if [ -f "$CURSOR_JSON" ] && NODE=$(find_node) && [ -n "$NODE" ]; then
     "$NODE" -e '
       const fs=require("fs"), f=process.argv[1];
@@ -172,8 +179,17 @@ if [ "$DO_CURSOR" != 0 ]; then
     fs.writeFileSync(f, JSON.stringify(j,null,2)+"\n");
   ' "$CURSOR_JSON" "$SERVER_ID" "$LAUNCHER"
   ok "registered in $CURSOR_JSON (other servers left untouched)"
+  # Cursor reads user skills from ~/.cursor/skills (its own built-ins live in
+  # ~/.cursor/skills-cursor, which it syncs — never write there).
+  mkdir -p "$CURSOR_SKILLS"
+  for skill in "$ROOT"/clients/cursor/skills/*/; do
+    name=$(basename "$skill")
+    rm -rf "${CURSOR_SKILLS:?}/$name"
+    cp -r "$skill" "$CURSOR_SKILLS/$name"
+  done
+  ok "installed /soci-card-read -move -boards -comment -set-token"
   CONFIGURED="${CONFIGURED:+$CONFIGURED and }Cursor"
-  say "rules: cp $ROOT/clients/cursor/rules/*.mdc <your-repo>/.cursor/rules/"
+  say "optional per-repo rule: cp $ROOT/clients/cursor/rules/*.mdc <your-repo>/.cursor/rules/"
 else
   say "skipped (--no-cursor)"
 fi

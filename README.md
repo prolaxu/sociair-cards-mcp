@@ -11,8 +11,9 @@ Zero dependencies: plain Node (>= 18) speaking MCP over stdio.
 curl -fsSL https://raw.githubusercontent.com/prolaxu/sociair-cards-mcp/main/install.sh | bash
 ```
 
-That clones to `~/.sociair-cards-mcp`, asks for your token, registers with Claude Code and Cursor,
-installs the `/soci-card:` commands, and verifies it all works. Restart your editor afterwards.
+That clones to `~/.sociair-cards-mcp`, asks for your token, registers the server with Claude Code
+and Cursor, installs the commands into both, and verifies it all works. Restart your editor
+afterwards.
 
 Already have a checkout? `./install.sh` does the same thing in place. Re-running is always safe.
 
@@ -31,8 +32,10 @@ Already have a checkout? `./install.sh` does the same thing in place. Re-running
 /soci-card:set-token <token>               when the old one expires
 ```
 
-In Cursor there are no slash commands — just ask ("read SC-TASK-2026-6850"). Copy
-`clients/cursor/rules/*.mdc` into a repo's `.cursor/rules/` to teach it the same workflow.
+Cursor gets the same five as skills, named with a dash — `/soci-card-read`, `/soci-card-move`,
+`/soci-card-boards`, `/soci-card-comment`, `/soci-card-set-token` — installed to
+`~/.cursor/skills/`. Asking in plain words works too. For a repo where you want the workflow
+always in context, copy `clients/cursor/rules/*.mdc` into its `.cursor/rules/`.
 
 ## Tools
 
@@ -78,7 +81,7 @@ bin/sociair-cards-mcp    launcher — finds node without a login shell
 server.mjs               entry point
 src/                     config, api, format, crm, mcp, prompts, resources
 src/tools/               one module per area; each tool is schema + handler together
-clients/                 slash commands (Claude Code) and rules (Cursor)
+clients/                 commands (Claude Code) and skills + rules (Cursor)
 ```
 
 Tools live in a registry, so `tools/list` and the dispatcher come from one definition and can't
